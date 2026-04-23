@@ -1,4 +1,4 @@
-# K-Unsplash Widget
+# K-Splash
 
 Plasma 6 wallpaper widget that fetches random photos from the Unsplash API.
 
@@ -36,7 +36,7 @@ This excludes Git metadata, Codex files, and `contents/config/local.json`.
 Install a packaged widget locally with:
 
 ```bash
-./install-local.sh ./com.mrod.k-unsplashwidget.plasmoid
+./install-local.sh ./com.mrod.k-splash.plasmoid
 ```
 
 The installer uses `${XDG_DATA_HOME:-$HOME/.local/share}/plasma/plasmoids` and preserves an existing `contents/config/local.json` if you already have local secrets saved.

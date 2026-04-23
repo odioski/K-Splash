@@ -74,7 +74,7 @@ PlasmoidItem {
             }
 
             Image {
-                source: Qt.resolvedUrl("../icons/com.mrod.k-unsplashwidget.png")
+                source: Qt.resolvedUrl("../icons/com.mrod.k-splash.png")
                 anchors.centerIn: parent
                 width: 96
                 height: 96
@@ -84,7 +84,7 @@ PlasmoidItem {
         }
 
         Text {
-            text: "K-Unsplash Widget"
+            text: "K-Splash"
             font.pixelSize: 16
             font.bold: true
             color: "#f2f5fb"
