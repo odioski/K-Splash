@@ -21,6 +21,8 @@ The widget settings page includes:
 - `Change wallpaper after each refresh`
 - target `Resolution width` and `Resolution height`
 
+The widget reads this file as a fallback when the settings page access key is blank. A tracked example is available at `contents/config/local.example.json`.
+
 ## Package
 
 Build a clean upload package with:
