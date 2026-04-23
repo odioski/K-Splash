@@ -1,0 +1,15 @@
+{
+  "KPackageStructure": "Plasma/Applet",
+  "KPlugin": {
+    "Id": "com.mrod.k-unsplashwidget",
+    "Name": "K-Unsplash Widget",
+    "Description": "Auto-refresh KDE wallpaper from Unsplash",
+    "Version": "1.0",
+    "License": "MIT",
+    "EnabledByDefault": true,
+    "Icon": "com.mrod.k-unsplashwidget"
+  },
+  "X-Plasma-API": "declarativeappletscript",
+  "X-Plasma-API-Minimum-Version": "6.0",
+  "X-Plasma-MainScript": "ui/main.qml"
+}

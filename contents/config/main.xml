@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg name="UnsplashWallpaperConfig">
+  <group name="General">
+    <entry name="intervalMinutes" type="Int">
+      <default>30</default>
+    </entry>
+    <entry name="category" type="String">
+      <default>nature</default>
+    </entry>
+    <entry name="resolutionWidth" type="Int">
+      <default>1920</default>
+    </entry>
+    <entry name="resolutionHeight" type="Int">
+      <default>1080</default>
+    </entry>
+    <entry name="unsplashAccessKey" type="String">
+      <default></default>
+    </entry>
+  </group>
+</kcfg>
