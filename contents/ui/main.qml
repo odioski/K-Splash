@@ -8,7 +8,7 @@ import "../code/logic.js" as Logic
 PlasmoidItem {
     id: root
     width: 220
-    height: 180
+    height: 250
 
     property bool busy: false
     property string attributionText: ""
@@ -16,6 +16,8 @@ PlasmoidItem {
     property string lastStatus: ""
     property string localAccessKey: ""
     property int remainingSeconds: plasmoid.configuration.intervalMinutes * 60
+
+    Plasmoid.backgroundHints: PlasmaCore.Types.DefaultBackground | PlasmaCore.Types.ConfigurableBackground
 
     P5Support.DataSource {
         id: exec
@@ -48,34 +50,73 @@ PlasmoidItem {
 
     Column {
         anchors.centerIn: parent
-        spacing: 4
+        spacing: 10
         width: parent.width - 16
 
-        Image {
-            source: "image://icon/com.mrod.k-unsplashwidget"
-            width: 32
-            height: 32
+        Rectangle {
+            width: 118
+            height: 118
             anchors.horizontalCenter: parent.horizontalCenter
+            radius: 10
+            color: "#1a1f2b"
+            border.width: 1
+            border.color: "#394055"
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 2
+                radius: 8
+                color: "transparent"
+                border.width: 1
+                border.color: "#262d3d"
+            }
+
+            Image {
+                source: Qt.resolvedUrl("../icons/com.mrod.k-unsplashwidget.png")
+                anchors.centerIn: parent
+                width: 96
+                height: 96
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+            }
         }
 
         Text {
-            text: busy ? "Updating wallpaper..." : "K-Unsplash Widget"
-            font.pixelSize: 14
+            text: "K-Unsplash Widget"
+            font.pixelSize: 16
+            font.bold: true
+            color: "#f2f5fb"
             horizontalAlignment: Text.AlignHCenter
             width: parent.width
         }
 
         Text {
-            text: "Next refresh: " + Math.floor(remainingSeconds / 60) + "m " + (remainingSeconds % 60) + "s"
+            text: busy
+                ? "Updating wallpaper..."
+                : "Auto-refresh KDE wallpaper\nfrom Unsplash"
             font.pixelSize: 11
+            color: "#c7d1e3"
             horizontalAlignment: Text.AlignHCenter
             width: parent.width
+            wrapMode: Text.Wrap
         }
 
         Text {
+            text: busy
+                ? "Next refresh resets after update"
+                : "Next refresh: " + Math.floor(remainingSeconds / 60) + "m " + (remainingSeconds % 60) + "s"
+            font.pixelSize: 10
+            color: "#8d9ab3"
+            horizontalAlignment: Text.AlignHCenter
+            width: parent.width
+            wrapMode: Text.Wrap
+        }
+
+        Text {
+            visible: lastStatus.length > 0
             text: lastStatus
             font.pixelSize: 10
-            color: "#aaaaaa"
+            color: "#b4c1d8"
             horizontalAlignment: Text.AlignHCenter
             width: parent.width
             wrapMode: Text.Wrap
@@ -85,28 +126,41 @@ PlasmoidItem {
             visible: currentDescription.length > 0
             text: currentDescription
             font.pixelSize: 10
-            color: "#d0d0d0"
+            color: "#d0d6e2"
             horizontalAlignment: Text.AlignHCenter
             width: parent.width
             wrapMode: Text.Wrap
         }
 
-        Text {
+        Rectangle {
             visible: attributionText.length > 0
-            text: attributionText
-            textFormat: Text.RichText
-            color: "#7cc4ff"
-            linkColor: "#7cc4ff"
-            font.pixelSize: 10
-            horizontalAlignment: Text.AlignHCenter
             width: parent.width
-            wrapMode: Text.Wrap
-            onLinkActivated: function(link) {
-                Qt.openUrlExternally(link);
+            height: attributionLabel.implicitHeight + 12
+            radius: 8
+            color: "#141926"
+            border.width: 1
+            border.color: "#293145"
+
+            Text {
+                id: attributionLabel
+                anchors.fill: parent
+                anchors.margins: 6
+                text: attributionText
+                textFormat: Text.RichText
+                color: "#7cc4ff"
+                linkColor: "#7cc4ff"
+                font.pixelSize: 10
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                onLinkActivated: function(link) {
+                    Qt.openUrlExternally(link);
+                }
             }
         }
 
         Button {
+            width: 132
+            anchors.horizontalCenter: parent.horizontalCenter
             text: busy ? "Working..." : "Refresh now"
             enabled: !busy
             onClicked: refreshNow()

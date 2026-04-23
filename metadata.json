@@ -4,10 +4,11 @@
     "Id": "com.mrod.k-unsplashwidget",
     "Name": "K-Unsplash Widget",
     "Description": "Auto-refresh KDE wallpaper from Unsplash",
+    "Author": "mrod",
     "Version": "1.0",
     "License": "MIT",
     "EnabledByDefault": true,
-    "Icon": "com.mrod.k-unsplashwidget"
+    "Icon": "start-here-kde"
   },
   "X-Plasma-API": "declarativeappletscript",
   "X-Plasma-API-Minimum-Version": "6.0",
