@@ -18,10 +18,16 @@ PlasmoidItem {
     property int remainingSeconds: plasmoid.configuration.intervalMinutes * 60
     property string currentTempImagePath: ""
     property string currentPhotoId: ""
+    property var currentFetchConfig: ({})
     property int currentRetryAttempt: 0
     readonly property int maxImageRetryAttempts: 3
 
     Plasmoid.backgroundHints: PlasmaCore.Types.DefaultBackground | PlasmaCore.Types.ConfigurableBackground
+
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: openSettings()
+    }
 
     P5Support.DataSource {
         id: exec
@@ -47,6 +53,29 @@ PlasmoidItem {
                 lastStatus = "Error: " + errorText;
                 currentRetryAttempt = 0;
                 busy = false;
+            }
+
+            disconnectSource(sourceName);
+        }
+    }
+
+    P5Support.DataSource {
+        id: fetchExec
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function(sourceName, data) {
+            var exitCode = data["exit code"];
+            var stderr = data["stderr"];
+            var stdout = data["stdout"];
+
+            if (exitCode === 0) {
+                handleUnsplashHtml(stdout || "", currentFetchConfig);
+            } else {
+                busy = false;
+                currentRetryAttempt = 0;
+                lastStatus = "Unsplash page fetch failed: " + (stderr || stdout || "HTTP request failed");
+                clearPhotoDetails();
             }
 
             disconnectSource(sourceName);
@@ -264,6 +293,16 @@ PlasmoidItem {
         currentDescription = "";
     }
 
+    function openSettings() {
+        var configureAction = Plasmoid.internalAction("configure");
+
+        if (configureAction) {
+            configureAction.trigger();
+        } else {
+            lastStatus = "Settings are unavailable in this launcher";
+        }
+    }
+
     function saveCurrentWallpaper() {
         var targetDirectory = plasmoid.configuration.downloadDirectory
             ? String(plasmoid.configuration.downloadDirectory).trim()
@@ -292,81 +331,61 @@ PlasmoidItem {
         saveExec.connectSource(command);
     }
 
+    function handleUnsplashHtml(html, config) {
+        try {
+            var details = Logic.extractDomPhotoDetails(html, config, currentRetryAttempt);
+
+            if (!details.imageUrl || details.imageUrl.length === 0) {
+                busy = false;
+                currentRetryAttempt = 0;
+                lastStatus = "Unsplash page did not include an image URL";
+                clearPhotoDetails();
+                return;
+            }
+
+            attributionText = details.attributionMarkup;
+            currentDescription = details.description;
+            currentPhotoId = details.photoId;
+            if (plasmoid.configuration.changeWallpaper) {
+                currentTempImagePath = Logic.buildTempFilePath(details.photoId);
+                lastStatus = "Downloading image...";
+                var cmd = Logic.buildCommand(details);
+                exec.connectSource(cmd);
+            } else {
+                currentTempImagePath = "";
+                busy = false;
+                currentRetryAttempt = 0;
+                lastStatus = "Photo loaded; enable wallpaper updates in settings";
+            }
+        } catch (e) {
+            busy = false;
+            currentRetryAttempt = 0;
+            lastStatus = "Parse error: " + e;
+            clearPhotoDetails();
+        }
+    }
+
     function refreshNow(retryAttempt, preserveCountdown) {
-        var backendUrl = plasmoid.configuration.backendUrl
-            ? String(plasmoid.configuration.backendUrl).trim()
-            : "";
         var nextRetryAttempt = retryAttempt || 0;
         var keepCountdown = preserveCountdown === true;
 
-        if (!backendUrl || backendUrl.length === 0) {
-            lastStatus = "Set backend URL in settings";
-            return;
-        }
-
         busy = true;
         currentRetryAttempt = nextRetryAttempt;
-        lastStatus = "Contacting backend...";
+        lastStatus = "Loading Unsplash page...";
         if (!keepCountdown) {
             remainingSeconds = plasmoid.configuration.intervalMinutes * 60;
         }
 
         var config = {
             category: plasmoid.configuration.category,
+            customCategories: plasmoid.configuration.customCategories,
             resolutionWidth: plasmoid.configuration.resolutionWidth,
             resolutionHeight: plasmoid.configuration.resolutionHeight
         };
 
-        var url = Logic.buildBackendRequestUrl(backendUrl, config);
-
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", url);
-
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    try {
-                        var json = JSON.parse(xhr.responseText);
-                        var photo = (json instanceof Array) ? json[0] : json;
-                        var details = Logic.extractPhotoDetails(photo, config);
-
-                        if (!details.imageUrl || details.imageUrl.length === 0) {
-                            busy = false;
-                            lastStatus = "Unsplash did not return an image URL";
-                            clearPhotoDetails();
-                            return;
-                        }
-
-                        attributionText = details.attributionMarkup;
-                        currentDescription = details.description;
-                        currentPhotoId = details.photoId;
-                        if (plasmoid.configuration.changeWallpaper) {
-                            currentTempImagePath = Logic.buildTempFilePath(details.photoId);
-                            lastStatus = "Downloading image...";
-                            var cmd = Logic.buildCommand(details);
-                            exec.connectSource(cmd);
-                        } else {
-                            currentTempImagePath = "";
-                            busy = false;
-                            currentRetryAttempt = 0;
-                            lastStatus = "Photo loaded; enable wallpaper updates in settings";
-                        }
-                    } catch (e) {
-                        busy = false;
-                        currentRetryAttempt = 0;
-                        lastStatus = "Parse error: " + e;
-                        clearPhotoDetails();
-                    }
-                } else {
-                    busy = false;
-                    currentRetryAttempt = 0;
-                    lastStatus = Logic.buildApiErrorMessage(xhr.responseText, xhr.status);
-                    clearPhotoDetails();
-                }
-            }
-        };
-
-        xhr.send();
+        var url = Logic.buildUnsplashDomUrl(config, nextRetryAttempt);
+        currentFetchConfig = config;
+        fetchExec.connectSource(Logic.buildDomFetchCommand(url));
     }
 
     Component.onCompleted: {

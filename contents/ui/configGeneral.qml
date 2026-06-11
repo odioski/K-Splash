@@ -20,7 +20,8 @@ KCM.SimpleKCM {
     property alias cfg_customCategories: customCategoriesField.text
     property alias cfg_resolutionWidth: widthSpin.value
     property alias cfg_resolutionHeight: heightSpin.value
-    property alias cfg_backendUrl: backendUrlField.text
+    property alias cfg_username: usernameField.text
+    property alias cfg_password: passwordField.text
     property alias cfg_enableSavedDownloads: saveDownloadCheck.checked
     property alias cfg_downloadDirectory: downloadDirectoryField.text
     readonly property string defaultPicturesPath: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
@@ -98,9 +99,16 @@ KCM.SimpleKCM {
         }
 
         TextField {
-            id: backendUrlField
-            Kirigami.FormData.label: "Backend URL"
-            placeholderText: "http://diskstation:8787/api/random-photo"
+            id: usernameField
+            Kirigami.FormData.label: "Username"
+            placeholderText: "Username"
+        }
+
+        TextField {
+            id: passwordField
+            Kirigami.FormData.label: "Password"
+            echoMode: TextInput.Password
+            placeholderText: "Password"
         }
 
         CheckBox {

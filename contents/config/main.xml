@@ -19,8 +19,11 @@
     <entry name="resolutionHeight" type="Int">
       <default>1080</default>
     </entry>
-    <entry name="backendUrl" type="String">
-      <default>http://127.0.0.1:8787/api/random-photo</default>
+    <entry name="username" type="String">
+      <default></default>
+    </entry>
+    <entry name="password" type="String">
+      <default></default>
     </entry>
     <entry name="enableSavedDownloads" type="Bool">
       <default>false</default>
