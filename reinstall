@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -u
+
+PLUGIN_ID="K-Splash"
+PACKAGE_DIR="/home/mrod/CODE/K-Splash"
+LOG_FILE="/tmp/k-splash-plasmashell.log"
+
+kpackagetool6 --type Plasma/Applet --remove "$PLUGIN_ID" || true
+kpackagetool6 --type Plasma/Applet --install "$PACKAGE_DIR"
+
+kquitapp6 plasmashell >/dev/null 2>&1 || true
+sleep 1
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user restart plasma-plasmashell.service >/dev/null 2>&1 || true
+    sleep 1
+fi
+
+if ! pgrep -x plasmashell >/dev/null 2>&1; then
+    nohup plasmashell --replace >"$LOG_FILE" 2>&1 </dev/null &
+fi
+
+sleep 1
+
+if pgrep -x plasmashell >/dev/null 2>&1; then
+    echo "plasmashell running"
+else
+    echo "plasmashell did not stay running; see $LOG_FILE" >&2
+    exit 1
+fi

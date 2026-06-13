@@ -13,6 +13,9 @@
     <entry name="customCategories" type="String">
       <default></default>
     </entry>
+    <entry name="userCollections" type="String">
+      <default></default>
+    </entry>
     <entry name="resolutionWidth" type="Int">
       <default>1920</default>
     </entry>

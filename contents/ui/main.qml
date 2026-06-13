@@ -1,5 +1,6 @@
 import QtQuick 6.0
 import QtQuick.Controls 6.0
+import QtQuick.Layouts 6.0
 import Qt5Compat.GraphicalEffects
 import org.kde.plasma.plasmoid 2.0
 import org.kde.plasma.core 2.0 as PlasmaCore
@@ -8,8 +9,14 @@ import "../code/logic.js" as Logic
 
 PlasmoidItem {
     id: root
-    width: 220
-    height: 250
+    width: 280
+    height: 340
+    implicitWidth: 280
+    implicitHeight: 340
+    Layout.minimumWidth: 180
+    Layout.minimumHeight: 240
+    Layout.preferredWidth: 280
+    Layout.preferredHeight: 340
 
     property bool busy: false
     property string attributionText: ""
@@ -20,6 +27,7 @@ PlasmoidItem {
     property string currentPhotoId: ""
     property var currentFetchConfig: ({})
     property int currentRetryAttempt: 0
+    readonly property int iconCardSize: Math.round(Math.max(160, Math.min(root.width - 12, root.height * 0.58, 360)))
     readonly property int maxImageRetryAttempts: 3
 
     Plasmoid.backgroundHints: PlasmaCore.Types.DefaultBackground | PlasmaCore.Types.ConfigurableBackground
@@ -102,6 +110,16 @@ PlasmoidItem {
         }
     }
 
+    P5Support.DataSource {
+        id: clickSoundExec
+        engine: "executable"
+        connectedSources: []
+
+        onNewData: function(sourceName, data) {
+            disconnectSource(sourceName);
+        }
+    }
+
     Timer {
         id: refreshTimer
         interval: 1000
@@ -124,19 +142,19 @@ PlasmoidItem {
 
         Rectangle {
             id: iconCard
-            width: 118
-            height: 118
+            width: root.iconCardSize
+            height: root.iconCardSize
             anchors.horizontalCenter: parent.horizontalCenter
-            radius: 10
+            radius: Math.round(width * 0.08)
             color: "#1a1f2b"
             border.width: 1
-            border.color: saveMouseArea.containsMouse && saveMouseArea.enabled ? "#7cc4ff" : "#394055"
+            border.color: iconMouseArea.containsMouse ? "#7cc4ff" : "#394055"
             scale: 1.0
 
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 2
-                radius: 8
+                radius: Math.max(6, iconCard.radius - 2)
                 color: "transparent"
                 border.width: 1
                 border.color: "#262d3d"
@@ -145,7 +163,7 @@ PlasmoidItem {
             Rectangle {
                 id: flashOverlay
                 anchors.fill: parent
-                radius: 10
+                radius: iconCard.radius
                 color: "#bfe6ff"
                 opacity: 0.0
             }
@@ -154,8 +172,8 @@ PlasmoidItem {
                 id: widgetIcon
                 source: Qt.resolvedUrl("../icons/K-Splash.png")
                 anchors.centerIn: parent
-                width: 96
-                height: 96
+                width: iconCard.width - Math.round(iconCard.width * 0.04)
+                height: width
                 fillMode: Image.PreserveAspectFit
                 smooth: true
             }
@@ -167,23 +185,16 @@ PlasmoidItem {
                 samples: 17
                 color: "#6bc8ff"
                 spread: 0.2
-                opacity: saveMouseArea.containsMouse && saveMouseArea.enabled ? 0.6 : 0.2
+                opacity: iconMouseArea.containsMouse ? 0.6 : 0.2
             }
 
             MouseArea {
-                id: saveMouseArea
+                id: iconMouseArea
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                enabled: plasmoid.configuration.enableSavedDownloads
-                    && currentTempImagePath.length > 0
-                    && !busy
+                cursorShape: Qt.PointingHandCursor
 
-                onClicked: {
-                    pulseAnimation.restart();
-                    flashAnimation.restart();
-                    saveCurrentWallpaper();
-                }
+                onClicked: handleIconClicked()
             }
 
             SequentialAnimation {
@@ -303,6 +314,17 @@ PlasmoidItem {
         }
     }
 
+    function playIconClickSound() {
+        clickSoundExec.connectSource(Logic.buildCompletionSoundCommand());
+    }
+
+    function handleIconClicked() {
+        pulseAnimation.restart();
+        flashAnimation.restart();
+        playIconClickSound();
+        saveCurrentWallpaper();
+    }
+
     function saveCurrentWallpaper() {
         var targetDirectory = plasmoid.configuration.downloadDirectory
             ? String(plasmoid.configuration.downloadDirectory).trim()
@@ -336,6 +358,12 @@ PlasmoidItem {
             var details = Logic.extractDomPhotoDetails(html, config, currentRetryAttempt);
 
             if (!details.imageUrl || details.imageUrl.length === 0) {
+                if (currentRetryAttempt + 1 < Math.max(maxImageRetryAttempts, Logic.countDomSources(config))) {
+                    lastStatus = "No image found, trying another source...";
+                    refreshNow(currentRetryAttempt + 1, true);
+                    return;
+                }
+
                 busy = false;
                 currentRetryAttempt = 0;
                 lastStatus = "Unsplash page did not include an image URL";
@@ -379,6 +407,8 @@ PlasmoidItem {
         var config = {
             category: plasmoid.configuration.category,
             customCategories: plasmoid.configuration.customCategories,
+            userCollections: plasmoid.configuration.userCollections,
+            username: plasmoid.configuration.username,
             resolutionWidth: plasmoid.configuration.resolutionWidth,
             resolutionHeight: plasmoid.configuration.resolutionHeight
         };

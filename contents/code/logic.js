@@ -15,12 +15,21 @@ function appendQueryParameters(url, params) {
     return url + (url.indexOf("?") === -1 ? "?" : "&") + params.join("&");
 }
 
+function encodePathSegments(path) {
+    return String(path || "")
+        .split("/")
+        .map(function(segment) {
+            return encodeURIComponent(segment);
+        })
+        .join("/");
+}
+
 function parseSearchTerms(config) {
     var terms = [];
     var category = normalizedText(config ? config.category : "");
     var customCategories = normalizedText(config ? config.customCategories : "");
 
-    if (category.length > 0) {
+    if (category.length > 0 && category !== "collections") {
         terms.push(category);
     }
 
@@ -33,19 +42,99 @@ function parseSearchTerms(config) {
         });
     }
 
-    if (terms.length === 0) {
-        terms.push("wallpaper");
-    }
-
     return terms;
 }
 
-function buildUnsplashDomUrl(config, offset) {
-    var terms = parseSearchTerms(config);
-    var index = offset || 0;
-    var category = terms[index % terms.length];
+function parseUserCollections(config) {
+    var collections = [];
+    var rawCollections = normalizedText(config ? config.userCollections : "");
 
-    return "https://unsplash.com/s/photos/" + encodeURIComponent(category);
+    if (rawCollections.length === 0) {
+        return collections;
+    }
+
+    rawCollections.split(",").forEach(function(collection) {
+        var normalized = normalizedText(collection);
+        var urlMatch;
+
+        if (normalized.length === 0) {
+            return;
+        }
+
+        urlMatch = normalized.match(/unsplash\.com\/collections\/([^?#\s]+)/i);
+        if (urlMatch && urlMatch[1]) {
+            normalized = urlMatch[1];
+        }
+
+        normalized = normalized.replace(/^\/?collections\//, "");
+        normalized = normalized.replace(/[?#].*$/, "");
+        normalized = normalized.replace(/^\/+|\/+$/g, "");
+
+        if (normalized.length > 0 && collections.indexOf(normalized) === -1) {
+            collections.push(normalized);
+        }
+    });
+
+    return collections;
+}
+
+function buildUnsplashDomUrl(config, offset) {
+    var collections = parseUserCollections(config);
+    var terms = parseSearchTerms(config);
+    var category = normalizedText(config ? config.category : "");
+    var username = normalizedText(config ? config.username : "");
+    var index = offset || 0;
+    var sources = [];
+    var source;
+
+    if (category === "collections" && collections.length === 0 && username.length > 0) {
+        sources.push({
+            type: "userCollections",
+            value: username.replace(/^@/, "")
+        });
+    }
+    collections.forEach(function(collection) {
+        sources.push({
+            type: "collection",
+            value: collection
+        });
+    });
+    terms.forEach(function(term) {
+        sources.push({
+            type: "search",
+            value: term
+        });
+    });
+    if (terms.indexOf("wallpaper") === -1) {
+        sources.push({
+            type: "search",
+            value: "wallpaper"
+        });
+    }
+
+    source = sources[index % sources.length];
+    if (source.type === "userCollections") {
+        return "https://unsplash.com/@" + encodeURIComponent(source.value) + "/collections";
+    }
+    if (source.type === "collection") {
+        return "https://unsplash.com/collections/" + encodePathSegments(source.value);
+    }
+
+    return "https://unsplash.com/s/photos/" + encodeURIComponent(source.value);
+}
+
+function countDomSources(config) {
+    var collections = parseUserCollections(config);
+    var terms = parseSearchTerms(config);
+    var category = normalizedText(config ? config.category : "");
+    var username = normalizedText(config ? config.username : "");
+    var count = collections.length + terms.length;
+
+    if (category === "collections" && collections.length === 0 && username.length > 0) {
+        count++;
+    }
+
+    return terms.indexOf("wallpaper") === -1 ? count + 1 : count;
 }
 
 function htmlDecode(value) {
@@ -110,25 +199,61 @@ function extractDomDescription(context) {
     return "";
 }
 
+function stripHtml(value) {
+    return normalizedText(htmlDecode(String(value || "").replace(/<[^>]*>/g, " ")));
+}
+
+function decodeJsonString(value) {
+    return htmlDecode(String(value || "")
+        .replace(/\\"/g, "\"")
+        .replace(/\\\//g, "/")
+        .replace(/\\n/g, " ")
+        .replace(/\\t/g, " "));
+}
+
+function extractJsonStringField(context, fieldName) {
+    var regex = new RegExp("\"" + fieldName + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+    var match = String(context || "").match(regex);
+
+    return match && match[1] ? normalizedText(decodeJsonString(match[1])) : "";
+}
+
+function buildPhotographer(name, username) {
+    var safeUsername = normalizedText(username);
+    var safeName = normalizedText(name) || safeUsername;
+
+    return {
+        name: safeName,
+        username: safeUsername,
+        profileUrl: safeUsername.length > 0 ? "https://unsplash.com/@" + safeUsername : ""
+    };
+}
+
 function extractDomPhotographer(context) {
-    var profileMatch = context.match(/(?:href|to)="\/@([a-zA-Z0-9_.-]+)"[^>]*>([^<]+)</);
+    var profileMatch = context.match(/(?:href|to)="\/@([a-zA-Z0-9_.-]+)"[^>]*>([\s\S]{0,500}?)<\/a>/);
     var labelMatch;
+    var userBlockMatch;
+    var username;
+    var name;
 
     if (profileMatch && profileMatch[1]) {
-        return {
-            name: normalizedText(htmlDecode(profileMatch[2])) || profileMatch[1],
-            username: profileMatch[1],
-            profileUrl: "https://unsplash.com/@" + profileMatch[1]
-        };
+        return buildPhotographer(stripHtml(profileMatch[2]), profileMatch[1]);
     }
 
     labelMatch = context.match(/Go to ([^"']+)'s profile/);
     if (labelMatch && labelMatch[1]) {
-        return {
-            name: normalizedText(htmlDecode(labelMatch[1])),
-            username: "",
-            profileUrl: ""
-        };
+        username = extractJsonStringField(context, "username");
+        return buildPhotographer(normalizedText(htmlDecode(labelMatch[1])), username);
+    }
+
+    userBlockMatch = context.match(/"user"\s*:\s*\{[\s\S]{0,3000}?\}/);
+    if (userBlockMatch && userBlockMatch[0]) {
+        username = extractJsonStringField(userBlockMatch[0], "username");
+        name = extractJsonStringField(userBlockMatch[0], "name");
+
+        if (name.length > 0 || username.length > 0) {
+            return buildPhotographer(name, username);
+        }
     }
 
     return {
@@ -157,6 +282,8 @@ function buildDomAttributionMarkup(details) {
         ? "<a href=\"" + escapeHtml(photoPageUrl) + "\">Unsplash</a>"
         : "Unsplash";
 
+    // Unsplash credit should read "Photo by [photographer] on Unsplash";
+    // do not replace "on Unsplash" with "by Unsplash".
     return "Photo by " + photographerLabel + " on " + unsplashLabel;
 }
 
@@ -198,8 +325,8 @@ function extractDomPhotoDetails(html, config, offset) {
 
     index = ((offset || 0) + Math.floor(Math.random() * candidates.length)) % candidates.length;
     selected = candidates[index];
-    start = Math.max(0, selected.sourceIndex - 4000);
-    end = Math.min(text.length, selected.sourceIndex + 4000);
+    start = Math.max(0, selected.sourceIndex - 20000);
+    end = Math.min(text.length, selected.sourceIndex + 20000);
     context = text.substring(start, end);
     photographer = extractDomPhotographer(context);
     photoPageMatch = context.match(/href="(\/photos\/[^"]+)"/);
@@ -260,6 +387,8 @@ function buildAttributionMarkup(photo) {
         ? "<a href=\"" + escapeHtml(photoPageUrl) + "\">Unsplash</a>"
         : "Unsplash";
 
+    // Unsplash credit should read "Photo by [photographer] on Unsplash";
+    // do not replace "on Unsplash" with "by Unsplash".
     return "Photo by " + photographerLabel + " on " + unsplashLabel;
 }
 
@@ -329,10 +458,27 @@ function buildTempFilePath(photoId) {
     return "/tmp/K-Splash-wallpaper-" + safeFileSegment(photoId) + ".jpg";
 }
 
+function buildCompletionSoundScript() {
+    return "if command -v paplay >/dev/null 2>&1 && [ -f /usr/share/sounds/freedesktop/stereo/complete.oga ]; then " +
+        "paplay /usr/share/sounds/freedesktop/stereo/complete.oga >/dev/null 2>&1 || true; " +
+        "elif command -v paplay >/dev/null 2>&1 && [ -f /usr/share/sounds/freedesktop/stereo/bell.oga ]; then " +
+        "paplay /usr/share/sounds/freedesktop/stereo/bell.oga >/dev/null 2>&1 || true; " +
+        "elif command -v canberra-gtk-play >/dev/null 2>&1; then " +
+        "canberra-gtk-play -i complete >/dev/null 2>&1 || canberra-gtk-play -i bell >/dev/null 2>&1 || true; " +
+        "elif command -v aplay >/dev/null 2>&1 && [ -f /usr/share/sounds/alsa/Front_Center.wav ]; then " +
+        "aplay -q /usr/share/sounds/alsa/Front_Center.wav >/dev/null 2>&1 || true; " +
+        "fi";
+}
+
+function buildCompletionSoundCommand() {
+    return "bash -c " + shellQuote(buildCompletionSoundScript());
+}
+
 function buildCommand(details) {
     var imageUrl = details && details.imageUrl ? details.imageUrl : "";
     var photoId = details && details.photoId ? details.photoId : "";
     var filePath = buildTempFilePath(photoId);
+    var playSoundScript = buildCompletionSoundScript();
     var qdbusScript =
         "var Desktops = desktops(); " +
         "for (var i = 0; i < Desktops.length; i++) { " +
@@ -352,7 +498,8 @@ function buildCommand(details) {
         "qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript " + shellQuote(qdbusScript) + "; " +
         "elif command -v dbus-send >/dev/null 2>&1; then " +
         "dbus-send --session --dest=org.kde.plasmashell --type=method_call /PlasmaShell org.kde.PlasmaShell.evaluateScript string:" + shellQuote(qdbusScript) + "; " +
-        "else echo " + shellQuote("qdbus or dbus-send command not found") + " >&2; exit 127; fi";
+        "else echo " + shellQuote("qdbus or dbus-send command not found") + " >&2; exit 127; fi" +
+        " && " + playSoundScript;
 
     return "bash -c " + shellQuote(script);
 }
@@ -376,14 +523,7 @@ function buildSaveCopyCommand(sourcePath, targetDirectory, details) {
     var safeSourcePath = normalizedText(sourcePath);
     var safeTargetDirectory = normalizedText(targetDirectory);
     var targetPath = safeTargetDirectory + "/" + buildSavedFileName(details);
-    var playSoundScript =
-        "if command -v canberra-gtk-play >/dev/null 2>&1; then " +
-        "canberra-gtk-play -i complete >/dev/null 2>&1 || true; " +
-        "elif command -v paplay >/dev/null 2>&1 && [ -f /usr/share/sounds/freedesktop/stereo/complete.oga ]; then " +
-        "paplay /usr/share/sounds/freedesktop/stereo/complete.oga >/dev/null 2>&1 || true; " +
-        "elif command -v aplay >/dev/null 2>&1 && [ -f /usr/share/sounds/alsa/Front_Center.wav ]; then " +
-        "aplay -q /usr/share/sounds/alsa/Front_Center.wav >/dev/null 2>&1 || true; " +
-        "fi";
+    var playSoundScript = buildCompletionSoundScript();
     var script =
         "set -eu; " +
         "mkdir -p " + shellQuote(safeTargetDirectory) +

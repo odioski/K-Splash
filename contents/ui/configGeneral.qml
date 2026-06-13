@@ -6,6 +6,7 @@ import org.kde.kcmutils as KCM
 
 KCM.SimpleKCM {
     property var defaultCategories: [
+        "collections",
         "dark",
         "fun",
         "skyline",
@@ -18,6 +19,7 @@ KCM.SimpleKCM {
     property alias cfg_intervalMinutes: intervalSpin.value
     property alias cfg_category: categoryCombo.editText
     property alias cfg_customCategories: customCategoriesField.text
+    property alias cfg_userCollections: userCollectionsField.text
     property alias cfg_resolutionWidth: widthSpin.value
     property alias cfg_resolutionHeight: heightSpin.value
     property alias cfg_username: usernameField.text
@@ -84,6 +86,12 @@ KCM.SimpleKCM {
             onTextChanged: rebuildCategoryModel()
         }
 
+        TextField {
+            id: userCollectionsField
+            Kirigami.FormData.label: "Collection URLs / IDs"
+            placeholderText: "Optional: comma-separated collection URLs, IDs, or slugs"
+        }
+
         SpinBox {
             id: widthSpin
             Kirigami.FormData.label: "Resolution width"
@@ -100,8 +108,8 @@ KCM.SimpleKCM {
 
         TextField {
             id: usernameField
-            Kirigami.FormData.label: "Username"
-            placeholderText: "Username"
+            Kirigami.FormData.label: "Unsplash username"
+            placeholderText: "Used for collections: https://unsplash.com/@username/collections"
         }
 
         TextField {
