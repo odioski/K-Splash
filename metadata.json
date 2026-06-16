@@ -15,7 +15,7 @@
     "License": "MIT",
     "EnabledByDefault": true,
     "Icon": "start-here-kde",
-    "Website": "https://store.kde.org/p/2356804ls"
+    "Website": "https://store.kde.org/p/2356804"
   },
   "X-Plasma-API": "declarativeappletscript",
   "X-Plasma-API-Minimum-Version": "6.0",
